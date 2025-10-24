@@ -1,0 +1,122 @@
+name: Deploy Ingestion Service to Azure Container Apps
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'ingestion/**'
+      - 'main.py'
+      - 'requirements.txt'
+      - 'Dockerfile'
+      - '.github/workflows/deploy-ingestion.yml'
+  workflow_dispatch:
+
+env:
+  RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+  CONTAINER_APP: ${{ secrets.INGESTION_CONTAINER_APP }}
+  REGISTRY: ${{ secrets.REGISTRY_URL }}
+  IMAGE_NAME: ingestion-service
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Azure login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Log in to ACR
+      uses: azure/docker-login@v1
+      with:
+        login-server: ${{ env.REGISTRY }}
+        username: ${{ secrets.ACR_USERNAME }}
+        password: ${{ secrets.ACR_PASSWORD }}
+
+    - name: Generate image tag
+      run: |
+        echo "IMAGE_TAG=$(date +%Y%m%d_%H%M%S)" >> $GITHUB_ENV
+        echo "SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_ENV
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: true
+        platforms: linux/amd64
+        tags: |
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.SHORT_SHA }}
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+        cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+    - name: Configure registry on Container App
+      run: |
+        az containerapp registry set \
+          --name "${{ env.CONTAINER_APP }}" \
+          --resource-group "${{ env.RESOURCE_GROUP }}" \
+          --server "${{ env.REGISTRY }}" \
+          --username "${{ secrets.ACR_USERNAME }}" \
+          --password "${{ secrets.ACR_PASSWORD }}"
+
+    - name: Deploy to Container Apps
+      run: |
+        IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
+        echo "Deploying image: $IMAGE"
+        
+        az containerapp update \
+          --name "${{ env.CONTAINER_APP }}" \
+          --resource-group "${{ env.RESOURCE_GROUP }}" \
+          --image "$IMAGE"
+
+    - name: Wait for deployment
+      run: sleep 30
+
+    - name: Get deployment URL
+      id: deployment
+      run: |
+        URL=$(az containerapp show \
+          --name "${{ env.CONTAINER_APP }}" \
+          --resource-group "${{ env.RESOURCE_GROUP }}" \
+          --query properties.configuration.ingress.fqdn -o tsv)
+        echo "url=$URL" >> $GITHUB_OUTPUT
+        echo "DEPLOYMENT_URL=https://$URL" >> $GITHUB_ENV
+
+    - name: Test health endpoint
+      run: |
+        echo "Testing health endpoint..."
+        URL="https://${{ steps.deployment.outputs.url }}"
+        
+        for i in {1..30}; do
+          if curl -f "$URL/health" 2>/dev/null; then
+            echo "✅ Health check passed!"
+            exit 0
+          fi
+          echo "Attempt $i/30: Waiting for app to be ready (${i}0s elapsed)..."
+          sleep 10
+        done
+        
+        echo "❌ Health check failed after 5 minutes"
+        exit 1
+
+    - name: Show deployment summary
+      if: success()
+      run: |
+        echo "🎉 Deployment successful!"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "App URL: https://${{ steps.deployment.outputs.url }}"
+        echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+    - name: Notify on failure
+      if: failure()
+      run: |
+        echo "❌ Deployment failed!"
+        echo "Check GitHub Actions logs for details"
