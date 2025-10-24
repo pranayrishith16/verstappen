@@ -1,0 +1,58 @@
+qdrant_retriever:
+  type: dense
+  module: retrieval.retrievers.qdrantDense
+  class: QdrantDenseRetriever
+  config:
+    collection_name: legal_docs
+    metric: cosine
+
+bm25_retriever:
+  type: bm25
+  module: retrieval.retrievers.bm25
+  class: BM25Retriever
+
+hybrid_retriever:
+  type: hybrid
+  module: retrieval.retrievers.hybrid
+  class: HybridRetriever
+
+embedder:
+  type: sentence_transformers
+  module: ingestion.embeddings.models.legal_bert
+  class: SentenceTransformerEmbedder
+  config:
+    model_name: nlpaueb/legal-bert-base-uncased
+
+cross_encoder_reranker:
+  type: cross_encoder
+  module: retrieval.retrievers.reranker.cross_encoder
+  class: CrossEncoderReranker
+  config:
+    model_name: "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    device: "cuda"
+
+chunker:
+  type: langchain
+  module: ingestion.dataprep.chunkers.langchain_chunker
+  class: LangChainChunker
+  config:
+    chunk_size: 1500
+    chunk_overlap: 150
+
+cleaner:
+  type: normal_cleaner
+  module: ingestion.dataprep.cleaners.pipeline
+  class: Cleaner
+
+annotator:
+  type: page_annotator
+  module: ingestion.dataprep.annotators.pipeline
+  class: LegalAnnotator
+
+azure_loader:
+  connection_string: ""
+  container_name: "legal-docs"
+  batch_size: 500
+  file_extensions:
+    - .pdf
+  skip_errors: true 
