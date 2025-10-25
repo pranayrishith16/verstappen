@@ -402,7 +402,7 @@ async def get_ingest_status():
     }
 
 @app.post("/ingest/batch")
-async def ingest_batch(max_files: int = 1):
+async def ingest_batch(max_files: int = 500):
     """
     Trigger ingestion of a limited batch of non-ingested files.
     This endpoint should be called by a scheduled Azure Container App Job.
