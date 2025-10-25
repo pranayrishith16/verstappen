@@ -335,6 +335,7 @@ class IngestionPipeline:
             
             # Step 1: Get Azure configuration
             loader_config_dict = registry.get_config('azure_loader')
+            self.logger.info('Azure loader configuration loaded')
             if not loader_config_dict:
                 raise ValueError("Azure loader configuration not found")
             
@@ -451,11 +452,17 @@ class IngestionPipeline:
         
         # Get pipeline components
         cleaner = registry.get("cleaner")
+        self.logger.info(f'Cleaner loaded')
         annotator = registry.get("annotator")
+        self.logger.info(f'Annotator loaded')
         chunker = registry.get("chunker")
+        self.logger.info(f'Chunker loaded')
         embedder = registry.get("embedder")
+        self.logger.info(f'Embedder loaded')
         faiss_retr = registry.get("qdrant_retriever")
+        self.logger.info(f'Qdrant loader loaded')
         bm25_retr = registry.get("bm25_retriever")
+        self.logger.info(f'bm25 loaded')
         
         from azure.storage.blob import BlobServiceClient
         conn_str = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
