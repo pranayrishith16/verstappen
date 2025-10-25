@@ -3,12 +3,6 @@ name: Deploy Ingestion Service to Azure Container Apps
 on:
   push:
     branches: [ main ]
-    paths:
-      - 'ingestion/**'
-      - 'main.py'
-      - 'requirements.txt'
-      - 'Dockerfile'
-      - '.github/workflows/deploy-ingestion.yml'
   workflow_dispatch:
 
 env:
