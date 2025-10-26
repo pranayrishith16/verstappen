@@ -136,7 +136,7 @@ class IngestionPipeline:
         annotator = registry.get("annotator")
         chunker = registry.get("chunker")
         embedder = registry.get("embedder")
-        faiss_retr = registry.get("qdrant_retriever")
+        qdrant_retr = registry.get("qdrant_retriever")
         bm25_retr = registry.get("bm25_retriever")
         
         logger.info("Pipeline components loaded from registry")
@@ -216,11 +216,11 @@ class IngestionPipeline:
             logger.info(f"✓ Generated {embeddings.shape[0]} embeddings "
                         f"(Dimension: {embeddings.shape[1]}D)")
             
-            # ===================== 6. INDEX FAISS =======================
-            logger.info("Building FAISS index...")
-            faiss_retr.build_index(all_chunks, embeddings)
-            faiss_retr.save_index()
-            logger.info("✓ Built and saved FAISS index")
+            # ===================== 6. INDEX QDRANT =======================
+            logger.info("Building QDRANT index...")
+            qdrant_retr.build_index(all_chunks, embeddings)
+            qdrant_retr.save_index()
+            logger.info("✓ Built and saved QDRANT index")
             
             # ===================== 7. INDEX BM25 =======================
             logger.info("Building BM25 index...")
@@ -459,7 +459,7 @@ class IngestionPipeline:
         self.logger.info(f'Chunker loaded')
         embedder = registry.get("embedder")
         self.logger.info(f'Embedder loaded')
-        faiss_retr = registry.get("qdrant_retriever")
+        qdrant_retr = registry.get("qdrant_retriever")
         self.logger.info(f'Qdrant loader loaded')
         bm25_retr = registry.get("bm25_retriever")
         self.logger.info(f'bm25 loaded')
@@ -535,9 +535,9 @@ class IngestionPipeline:
             logger.info(f"Generating embeddings for {len(all_chunks)} chunks...")
             embeddings = embedder.encode(all_chunks)
             
-            logger.info("Building FAISS index...")
-            faiss_retr.build_index(all_chunks, embeddings)
-            faiss_retr.save_index()
+            logger.info("Building QDRANT index...")
+            qdrant_retr.build_index(all_chunks, embeddings)
+            qdrant_retr.save_index()
             
             logger.info("Building BM25 index...")
             bm25_retr.build_index(all_chunks)
@@ -624,10 +624,10 @@ class IngestionPipeline:
         embeddings = embedder.encode(chunks)
         logger.info(f"✓ Generated {embeddings.shape[0]} embeddings ({embeddings.shape[1]}D)")
 
-        # 6. INDEX FAISS
-        faiss_retr = registry.get("qdrant_retriever")
-        faiss_retr.build_index(chunks, embeddings)
-        faiss_retr.save_index()
+        # 6. INDEX QDRANT
+        qdrant_retr = registry.get("qdrant_retriever")
+        qdrant_retr.build_index(chunks, embeddings)
+        qdrant_retr.save_index()
 
         # 7. INDEX BM25
         bm25_retr = registry.get("bm25_retriever")

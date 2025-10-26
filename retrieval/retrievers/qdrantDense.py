@@ -152,7 +152,14 @@ class QdrantDenseRetriever(Retriever):
     # ============= Main Methods =============
 
     def build_index(self, chunks: List[Chunk], embeddings: Optional[np.ndarray] = None) -> None:
-        """Build or rebuild the entire index (deletes existing collection first)."""
+        """
+        Build or append to the index.
+        
+        - If collection doesn't exist: Creates new collection and adds chunks
+        - If collection exists: Automatically appends chunks (does NOT delete)
+        
+        This is now the single entry point - no need to call append() separately.
+        """
         if not chunks:
             self.logger.warning("No chunks provided for indexing")
             return
@@ -169,18 +176,15 @@ class QdrantDenseRetriever(Retriever):
 
         self.dimension = embeddings.shape[1]
 
-        # Delete existing collection
-        try:
-            self.logger.info(f"Deleting existing collection...")
-            self.session.delete(
-                f"{self.qdrant_url}/collections/{self.collection_name}",
-                headers=self.headers,
-                timeout=self.timeout,
-                verify=False
-            )
-        except Exception as e:
-            self.logger.debug(f"Collection didn't exist: {e}")
+        # Check if collection already exists
+        if self._collection_exists():
+            # Collection exists - APPEND mode (no delete)
+            self.logger.info(f"✓ Collection '{self.collection_name}' already exists")
+            return self.append(chunks, embeddings)
 
+        # Collection doesn't exist - CREATE mode
+        self.logger.info(f"Collection doesn't exist, creating new collection")
+        
         # Create collection
         self._create_collection(self.dimension)
 
